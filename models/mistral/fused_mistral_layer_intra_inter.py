@@ -5,11 +5,11 @@ import bitsandbytes as bnb
 import torch.nn.functional as F
 import bitsandbytes.functional as BF
 
-from ...operators.rope_kernels import rope_forward, rope_backward, calculate_settings
-from ...operators.silu_kernels import silu_backward
-from ...operators.rmsnorm_kernels import rmsnorm_backward, rmsnorm_forward
-from ...operators.softmax_kernels import softmax_backward
-from ...operators.compress_function import (
+from operators.rope_kernels import rope_forward, rope_backward, calculate_settings
+from operators.silu_kernels import silu_backward
+from operators.rmsnorm_kernels import rmsnorm_backward, rmsnorm_forward
+from operators.softmax_kernels import softmax_backward
+from operators.compress_function import (
     compression_pack_channel_base,
     compression_pack_quant_base,
     compression_pack_softmax_base,
@@ -585,6 +585,18 @@ class FusedMistralLayerIntraInter(torch.nn.Module):
         self.softmax_outlier_ratio = hyclora_config.softmax_outlier_ratio
         self.layernorm_outlier_ratio = hyclora_config.layernorm_outlier_ratio
         self.q_bit = hyclora_config.q_bit
+        
+        # print the configuration in color format
+        if self.use_hyclora:
+            print(f"\033[1;34m********** HycLora Configuration **********\033[0m")
+            print(f"\033[1;32m[INFO] HycLora type: intra-inter\033[0m")
+            print(f"\033[1;32m[INFO] Iteration Threshold: {self.iteration_threshold}\033[0m")
+            print(f"\033[1;32m[INFO] Softmax Outlier Ratio: {self.softmax_outlier_ratio}\033[0m")
+            print(f"\033[1;32m[INFO] Layernorm Outlier Ratio: {self.layernorm_outlier_ratio}\033[0m")
+            print(f"\033[1;32m[INFO] Quantization Bit: {self.q_bit}\033[0m")
+            print(f"\033[1;34m******************************************\033[0m")
+        else:
+            print(f"\033[1;31m********** HycLora is not used **********\033[0m")
         
     def forward(
         self,

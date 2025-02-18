@@ -3,10 +3,10 @@ import torch
 import typing
 import bitsandbytes as bnb
 
-from ...operators.rope_kernels import rope_forward, rope_backward, calculate_settings
-from ...operators.silu_kernels import silu_backward
-from ...operators.rmsnorm_kernels import rmsnorm_backward, rmsnorm_forward
-from ...operators.softmax_kernels import softmax_backward
+from operators.rope_kernels import rope_forward, rope_backward, calculate_settings
+from operators.silu_kernels import silu_backward
+from operators.rmsnorm_kernels import rmsnorm_backward, rmsnorm_forward
+from operators.softmax_kernels import softmax_backward
 
 from ..utils.compute_utils import(
     hidden_to_head_shape, head_to_hidden_shape,

@@ -3,16 +3,16 @@ import torch
 import typing
 import bitsandbytes as bnb
 
-from ...operators.rope_kernels import rope_forward, rope_backward, calculate_settings
-from ...operators.silu_kernels import silu_backward
-from ...operators.rmsnorm_kernels import rmsnorm_backward, rmsnorm_forward
-from ...operators.softmax_kernels import softmax_backward
-from ...operators.compress_function import (
-    compress_pack_channel_base,
-    compress_pack_quant_base,
-    compress_pack_softmax_base,
-    outlier_addition_fuse_decompress_dequantization,
-    decompress_dequantization,
+from operators.rope_kernels import rope_forward, rope_backward, calculate_settings
+from operators.silu_kernels import silu_backward
+from operators.rmsnorm_kernels import rmsnorm_backward, rmsnorm_forward
+from operators.softmax_kernels import softmax_backward
+from operators.compress_function import (
+    compression_pack_channel_base,
+    compression_pack_quant_base,
+    compression_pack_softmax_base,
+    outlier_addition_fuse_decompression_dequantization,
+    decompression_dequantization,
     update_dict,
 )
 
@@ -96,7 +96,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         
         #* compress the (copy of) x
         x_copy = x.clone()
-        x_o, x_q, x_channel_idx, x_scale = compress_pack_channel_base(
+        x_o, x_q, x_channel_idx, x_scale = compression_pack_channel_base(
             x=x_copy, o_ratio=layernorm_outlier_ratio, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['x']
@@ -113,7 +113,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         v, _, v_lora_a = lora_forward(w_v, w_v_quant_state, w_v_lora_a, w_v_lora_b, b_v, x_norm_1)
         
         #* compress x_norm_1
-        x_norm_1_q, x_norm_1_scale = compress_pack_quant_base(
+        x_norm_1_q, x_norm_1_scale = compression_pack_quant_base(
             x=x_norm_1, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['x_norm_1']
@@ -136,12 +136,12 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         s = q @ k.transpose(-2, -1) / math.sqrt(head_dim)
         
         #* compress q, k
-        q_q, q_scale = compress_pack_quant_base(
+        q_q, q_scale = compression_pack_quant_base(
             x=q, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['q']
         )
-        k_q, k_scale = compress_pack_quant_base(
+        k_q, k_scale = compression_pack_quant_base(
             x=k, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['k']
@@ -162,7 +162,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         o = a @ v
         
         #* compress a
-        a_o, a_threshold = compress_pack_softmax_base(
+        a_o, a_threshold = compression_pack_softmax_base(
             x=a, o_ratio=softmax_outlier_ratio, it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['a']
         )
@@ -170,7 +170,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         del a
         
         #* compress v
-        v_q, v_scale = compress_pack_quant_base(
+        v_q, v_scale = compression_pack_quant_base(
             x=v, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['v']
@@ -184,7 +184,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         o_final, _, o_final_lora_a = lora_forward(w_o, w_o_quant_state, w_o_lora_a, w_o_lora_b, b_o, o)
         
         #* compress o
-        o_q, o_scale = compress_pack_quant_base(
+        o_q, o_scale = compression_pack_quant_base(
             x=o, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['o']
@@ -200,7 +200,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         
         #* compress the (copy of) x_medium
         x_medium_copy = x_medium.clone()
-        x_medium_o, x_medium_q, x_medium_channel_idx, x_medium_scale = compress_pack_channel_base(
+        x_medium_o, x_medium_q, x_medium_channel_idx, x_medium_scale = compression_pack_channel_base(
             x=x_medium_copy, o_ratio=layernorm_outlier_ratio, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['x_medium']
@@ -213,7 +213,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         up, _, up_lora_a = lora_forward(w_up, w_up_quant_state, w_up_lora_a, w_up_lora_b, b_up, x_norm_2)
 
         #* compress the x_norm_2
-        x_norm_2_q, x_norm_2_scale = compress_pack_quant_base(
+        x_norm_2_q, x_norm_2_scale = compression_pack_quant_base(
             x=x_norm_2, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['x_norm_2']
@@ -224,7 +224,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         fn = torch.nn.functional.silu(gate)
         
         #* compress the gate
-        gate_q, gate_scale = compress_pack_quant_base(
+        gate_q, gate_scale = compression_pack_quant_base(
             x=gate, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['gate']
@@ -235,13 +235,13 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         hadamard = up * fn
         
         #* compress the up / fn
-        up_q, up_scale = compress_pack_quant_base(
+        up_q, up_scale = compression_pack_quant_base(
             x=up, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['up']
         )
         del up
-        fn_q, fn_scale = compress_pack_quant_base(
+        fn_q, fn_scale = compression_pack_quant_base(
             x=fn, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['fn']
@@ -252,7 +252,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         down, _, down_lora_a = lora_forward(w_down, w_down_quant_state, w_down_lora_a, w_down_lora_b, b_down, hadamard)
         
         #* compress the hadamard
-        hadamard_q, hadamard_scale = compress_pack_quant_base(
+        hadamard_q, hadamard_scale = compression_pack_quant_base(
             x=hadamard, q_bit=q_bit,
             q_method='per-channel', it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['hadamard']
@@ -372,7 +372,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         ) = ctx.saved_tensors
         
         #* dequantize hadamard
-        hadamard = decompress_dequantization(hadamard_q, hadamard_scale, ctx.q_bit)
+        hadamard = decompression_dequantization(hadamard_q, hadamard_scale, ctx.q_bit)
         del hadamard_q, hadamard_scale
         
         # down proj part
@@ -380,8 +380,8 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         del hadamard
         
         #* dequantize up
-        up = decompress_dequantization(up_q, up_scale, ctx.q_bit)
-        fn = decompress_dequantization(fn_q, fn_scale, ctx.q_bit)
+        up = decompression_dequantization(up_q, up_scale, ctx.q_bit)
+        fn = decompression_dequantization(fn_q, fn_scale, ctx.q_bit)
         del up_q, up_scale, fn_q, fn_scale
         
         # hadamard
@@ -390,12 +390,12 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         del grad_down, up, fn
         
         #* dequantize gate
-        gate = decompress_dequantization(gate_q, gate_scale, ctx.q_bit)
+        gate = decompression_dequantization(gate_q, gate_scale, ctx.q_bit)
         grad_fn = silu_backward(gate, grad_hadamard_1)
         del gate_q, gate_scale, gate, grad_hadamard_1
         
         #* dequantize x_norm_2
-        x_norm_2 = decompress_dequantization(x_norm_2_q, x_norm_2_scale, ctx.q_bit)
+        x_norm_2 = decompression_dequantization(x_norm_2_q, x_norm_2_scale, ctx.q_bit)
         del x_norm_2_q, x_norm_2_scale
         
         # gate proj part
@@ -408,7 +408,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         del grad_up, grad_gate, grad_hadamard_2
         
         #* dequantize x_medium
-        x_medium = outlier_addition_fuse_decompress_dequantization(x_medium_q, x_medium_scale, x_medium_o, ctx.post_layernorm_channel, ctx.q_bit)
+        x_medium = outlier_addition_fuse_decompression_dequantization(x_medium_q, x_medium_scale, x_medium_o, ctx.post_layernorm_channel, ctx.q_bit)
         del x_medium_q, x_medium_scale, x_medium_o
         
         # layernorm & rmsnorm backward
@@ -422,7 +422,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         grad_medium = grad_norm_2 + grad_output
         
         #* dequantize o
-        o = decompress_dequantization(o_q, o_scale, ctx.q_bit)
+        o = decompression_dequantization(o_q, o_scale, ctx.q_bit)
         del o_q, o_scale
         
         # o part
@@ -435,7 +435,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         #* dequantize a
         a = a_o.to_dense()
         a = a.reshape(ctx.a_shape)
-        v = decompress_dequantization(v_q, v_scale, ctx.q_bit, is_head=True, num_heads=ctx.num_heads)
+        v = decompression_dequantization(v_q, v_scale, ctx.q_bit, is_head=True, num_heads=ctx.num_heads)
         del a_o, v_q, v_scale
         
         # backward of second GEMM: O = A @ V
@@ -454,8 +454,8 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         grad_s = grad_s / math.sqrt(ctx.head_dim)
         
         #* dequantize q
-        q = decompress_dequantization(q_q, q_scale, ctx.q_bit, is_head=True, num_heads=ctx.num_heads)
-        k = decompress_dequantization(k_q, k_scale, ctx.q_bit, is_head=True, num_heads=ctx.num_heads)
+        q = decompression_dequantization(q_q, q_scale, ctx.q_bit, is_head=True, num_heads=ctx.num_heads)
+        k = decompression_dequantization(k_q, k_scale, ctx.q_bit, is_head=True, num_heads=ctx.num_heads)
         # d L / d K = (d L / d S)^T @ Q
         grad_k = grad_s.transpose(-2, -1) @ q
         if ctx.num_heads != ctx.num_key_value_heads:
@@ -474,7 +474,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         grad_v = head_to_hidden_shape(grad_v)
         
         #* dequantize x_norm_1
-        x_norm_1 = decompress_dequantization(x_norm_1_q, x_norm_1_scale, ctx.q_bit)
+        x_norm_1 = decompression_dequantization(x_norm_1_q, x_norm_1_scale, ctx.q_bit)
         del x_norm_1_q, x_norm_1_scale
         
         # backward of q_proj
@@ -489,7 +489,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
         grad_x += grad_x_temp
         
         #* dequantize x
-        x = outlier_addition_fuse_decompress_dequantization(x_q, x_scale, x_o, ctx.input_layernorm_channel, ctx.q_bit)
+        x = outlier_addition_fuse_decompression_dequantization(x_q, x_scale, x_o, ctx.input_layernorm_channel, ctx.q_bit)
         del x_q, x_scale, x_o
         
         # layernorm or rmsnorm backward
@@ -554,7 +554,7 @@ class FusedLlamaLayerIntraFunc(torch.autograd.Function):
             None,
             grad_w_down_lora_a,
             grad_w_down_lora_b
-        ) + (None,) * 9
+        ) + (None,) * 10
 
 
 class FusedLlamaLayerIntra(torch.nn.Module):

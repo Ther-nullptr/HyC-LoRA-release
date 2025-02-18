@@ -18,6 +18,9 @@ from peft import PeftModel, LoraConfig, TaskType, get_peft_model
 from datasets import load_dataset
 from accelerate.utils import set_seed
 
+from models.llama.modeling_llama import LlamaForCausalLM
+from models.mistral.modeling_mistral import MistralForCausalLM
+
 os.environ["WANDB_PROJECT"] = "hyclora-gsm8k-math"
 
 IGNORE_INDEX = -100
@@ -135,9 +138,9 @@ class TrainingArguments(transformers.TrainingArguments):
 
 # hyper parameters about hyclora method
 @dataclass
-class HyCLoRAArguments(transformers.TrainingArguments):
+class HyCLoRAArguments:
     use_hyclora: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Whether to replace the original training module to fused training module"}
     )
     layer_type: str = field(
@@ -148,11 +151,11 @@ class HyCLoRAArguments(transformers.TrainingArguments):
         default=5,
         metadata={"help": "calibration steps"}
     )
-    softmax_outlier_ratio: int = field(
+    softmax_outlier_ratio: float = field(
         default=0.05,
         metadata={"help": "softmax outlier selection ratio"}
     )
-    layernorm_outlier_ratio: int = field(
+    layernorm_outlier_ratio: float = field(
         default=0.005,
         metadata={"help": "layernorm outlier channels selection ratio"}  
     )
@@ -316,19 +319,8 @@ def train_and_eval():
     )
     model_args, data_args, training_args, hyclora_args = parser.parse_args_into_dataclasses()
 
-    if model_args.full_precision:
-        model = transformers.AutoModelForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            low_cpu_mem_usage=True,
-            torch_dtype=torch.bfloat16,
-            token=model_args.token,
-            attn_implementation=(
-                "flash_attention_2" if model_args.flash_attention else "eager"
-            ),
-            trust_remote_code=True,
-        )
-    else:
-        model = transformers.AutoModelForCausalLM.from_pretrained(
+    if 'llama' in model_args.model_name_or_path:
+        model = LlamaForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             low_cpu_mem_usage=True,
             torch_dtype=torch.bfloat16,
@@ -345,6 +337,27 @@ def train_and_eval():
             ),
             trust_remote_code=True,
         )
+    elif 'mistral' in model_args.model_name_or_path:
+        model = MistralForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.bfloat16,
+            token=model_args.token,
+            use_cache=False if model_args.gradient_checkpointing_enable else True,
+            quantization_config=transformers.BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+            ),
+            attn_implementation=(
+                "flash_attention_2" if model_args.flash_attention else "eager"
+            ),
+            trust_remote_code=True,
+        )
+    else:
+        raise ValueError("No implementation of model. Now support: llama/mistral")
+        
     model = peft.prepare_model_for_kbit_training(
         model,
         use_gradient_checkpointing=model_args.gradient_checkpointing_enable,
@@ -364,7 +377,7 @@ def train_and_eval():
             inference_mode=False,
             r=model_args.rank,
             lora_alpha=model_args.lora_alpha,
-            lora_dropout=model_args.lora_dropout,
+            lora_dropout=0.0,
             target_modules=target_modules,
             init_lora_weights=True if model_args.init_lora_weights == "qlora" else model_args.init_lora_weights,
         )
@@ -384,6 +397,9 @@ def train_and_eval():
             is_trainable=True,
             token=model_args.token,
         )
+    
+    # set the hyclora config
+    model.set_fused_llama_layer(hyclora_args)
 
     # get the model name
     for name, module in model.named_modules():
@@ -425,8 +441,6 @@ def train_and_eval():
     )
 
     model = model.to(torch.bfloat16)
-    # set the hyclora config
-    model.set_fused_llama_leyer(hyclora_args)
     
     if training_args.is_train:
         trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
