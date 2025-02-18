@@ -36,10 +36,6 @@ def get_statistics_outlier(x: torch.Tensor, outlier_ratio: float):
     return outlier
 
 
-
-
-
-
 def get_statistics_structed_pruning(x: torch.Tensor, outlier_ratio: float):
     channel_norm = x.abs().norm(dim=-2)
     outlier_channel_index = torch.topk(channel_norm, int(x.shape[-1] * outlier_ratio), largest=True).indices
@@ -148,7 +144,7 @@ def outlier_subtraction_fuse_compression_quantization(x, s, channel, quantize_bi
 
 
 # outlier addition + dequantization
-def outlier_addition_fuse_decompress_dequantization(q, s, x_outlier, channel, quantize_bit=8, is_head=False, num_heads=1, dtype=torch.bfloat16):
+def outlier_addition_fuse_decompression_dequantization(q, s, x_outlier, channel, quantize_bit=8, is_head=False, num_heads=1, dtype=torch.bfloat16):
     B, M, _ = q.shape
     N = s.shape[-1]
 
@@ -162,7 +158,7 @@ def outlier_addition_fuse_decompress_dequantization(q, s, x_outlier, channel, qu
     )
     x = torch.empty((B, M, N), device=q.device, dtype=torch.bfloat16)
 
-    decompress_dequantization_kernel[grid](
+    decompression_dequantization_kernel[grid](
         x, q, s,
         B, M, N,
         x.stride(0), x.stride(1), x.stride(2),
@@ -215,7 +211,7 @@ def compression_quantization(x, s, quantize_bit=8, dtype=torch.bfloat16):
 
 
 # dequantization (only with scale)
-def decompress_dequantization(q, s, quantize_bit=8, is_head=False, num_heads=1, dtype=torch.bfloat16):
+def decompression_dequantization(q, s, quantize_bit=8, is_head=False, num_heads=1, dtype=torch.bfloat16):
     B, M, _ = q.shape
     N = s.shape[-1]
 
@@ -230,7 +226,7 @@ def decompress_dequantization(q, s, quantize_bit=8, is_head=False, num_heads=1, 
     x = torch.empty((B, M, N), device=q.device, dtype=torch.bfloat16)
 
     # ************************** triton version **************************
-    decompress_dequantization_kernel[grid](
+    decompression_dequantization_kernel[grid](
         x, q, s,
         B, M, N,
         x.stride(0), x.stride(1), x.stride(2),
@@ -279,7 +275,7 @@ def compression_quantization_with_zero_point(x, s, z, quantize_bit=8, dtype=torc
 
 
 # dequantization (with scale and zero point)
-def decompress_dequantization_with_zero_point(q, s, z, quantize_bit=8, is_head=False, num_heads=1, dtype=torch.bfloat16):
+def decompression_dequantization_with_zero_point(q, s, z, quantize_bit=8, is_head=False, num_heads=1, dtype=torch.bfloat16):
     B, M, _ = q.shape
     N = s.shape[-1]
 
@@ -294,7 +290,7 @@ def decompress_dequantization_with_zero_point(q, s, z, quantize_bit=8, is_head=F
     )
     x = torch.empty((B, M, N), device=q.device, dtype=torch.bfloat16)
 
-    decompress_dequantization_with_zero_point_kernel[grid](
+    decompression_dequantization_with_zero_point_kernel[grid](
         x, q, s, z,
         B, M, N,
         x.stride(0), x.stride(1), x.stride(2),
@@ -310,36 +306,36 @@ def decompress_dequantization_with_zero_point(q, s, z, quantize_bit=8, is_head=F
     return x
 
 # compress softmax's attention map
-def compress_softmax(x: torch.Tensor, outlier: float):
+def compression_softmax(x: torch.Tensor, outlier: float):
     mask = (x > outlier)
     x_outlier = x * mask
     x_outlier_sparse = x_outlier.flatten().to_sparse()
     return x_outlier_sparse
 
 # decompress softmax's attention map
-def decompress_softmax(x_sparse: torch.Tensor):
+def decompression_softmax(x_sparse: torch.Tensor):
     return x_sparse.to_dense()
 
 # unstructed compression(use COO format)
-def compress_unstructed_pruning_coo(x: torch.Tensor, outlier: float):
+def compression_unstructed_pruning_coo(x: torch.Tensor, outlier: float):
     mask = (x.abs() > outlier)
     x_outlier = x * mask
     x_outlier_sparse = x_outlier.to_sparse()
     return x_outlier_sparse
 
 # unstructed decompress(use COO format)
-def decompress_unstructed_pruning_coo(x_sparse: torch.Tensor):
+def decompression_unstructed_pruning_coo(x_sparse: torch.Tensor):
     return x_sparse.to_dense()
 
 # unstructed compression(use bitmap format)
-def compress_unstructed_pruning_bitmap(x: torch.Tensor, outlier: float):
+def compression_unstructed_pruning_bitmap(x: torch.Tensor, outlier: float):
     mask = (x.abs() > outlier)
     x_outlier = x * mask
     x_outlier_sparse = x_outlier[mask]
     return x_outlier_sparse, mask
 
 # unstructed decompress(use bitmap format)
-def decompress_unstructed_pruning_bitmap(x_sparse: torch.Tensor, mask: torch.Tensor):
+def decompression_unstructed_pruning_bitmap(x_sparse: torch.Tensor, mask: torch.Tensor):
     x = torch.empty_like(mask, device=x_sparse.device, dtype=x_sparse.dtype)
     x[mask] = x_sparse
     return x
@@ -347,7 +343,7 @@ def decompress_unstructed_pruning_bitmap(x_sparse: torch.Tensor, mask: torch.Ten
 
 # ********************pack "get statistics" and "compress"********************
 # type: outlier channel extraction + quantization
-def compress_pack_channel_base(x, o_ratio, q_bit, q_method, it_num, it_num_thd, static_value):
+def compression_pack_channel_base(x, o_ratio, q_bit, q_method, it_num, it_num_thd, static_value):
     if it_num < it_num_thd:
         o_channel_idx, scale = get_statistics_channel_base(x, o_ratio, q_bit, q_method)
     else:
@@ -356,7 +352,7 @@ def compress_pack_channel_base(x, o_ratio, q_bit, q_method, it_num, it_num_thd, 
     return o, q, o_channel_idx, scale
 
 # type: quantization
-def compress_pack_quant_base(x, q_bit, q_method, it_num, it_num_thd, static_value):
+def compression_pack_quant_base(x, q_bit, q_method, it_num, it_num_thd, static_value):
     if it_num < it_num_thd:
         scale = get_statistics_only_quant(x, q_bit, q_method)
     else:
@@ -365,7 +361,7 @@ def compress_pack_quant_base(x, q_bit, q_method, it_num, it_num_thd, static_valu
     return q, scale
 
 # type: quantization with zero point
-def compress_pack_quant_zp_base(x, q_bit, q_method, it_num, it_num_thd, static_value):
+def compression_pack_quant_zp_base(x, q_bit, q_method, it_num, it_num_thd, static_value):
     if it_num < it_num_thd:
         scale, zero_point = get_statistics_only_quant_zero_point(x, q_bit, q_method)
     else:
@@ -374,29 +370,29 @@ def compress_pack_quant_zp_base(x, q_bit, q_method, it_num, it_num_thd, static_v
     return q, scale, zero_point
 
 # type: softmax attention map compression
-def compress_pack_softmax_base(x, o_ratio, it_num, it_num_thd, static_value):
+def compression_pack_softmax_base(x, o_ratio, it_num, it_num_thd, static_value):
     if it_num < it_num_thd:
         outlier = get_statistics_softmax(x, o_ratio)
     else:
         outlier = static_value['outlier']
-    o = compress_softmax(x, outlier)
+    o = compression_softmax(x, outlier)
     return o, outlier
 
 # type: unstructed pruning(using COO format)
-def compress_pack_unstructed_pruning_coo(x, o_ratio, it_num, it_num_thd, static_value):
+def compression_pack_unstructed_pruning_coo(x, o_ratio, it_num, it_num_thd, static_value):
     if it_num < it_num_thd:
         outlier = get_statistics_outlier(x, o_ratio) # a funny reuse
     else:
         outlier = static_value['outlier']
-    x_outlier = compress_unstructed_pruning_coo(x, outlier)
+    x_outlier = compression_unstructed_pruning_coo(x, outlier)
     return x_outlier, outlier
 
 # type: unstructed pruning(using bitmap format)
-def compress_pack_unstructed_pruning_bitmap(x, o_ratio, it_num, it_num_thd, static_value):
+def compression_pack_unstructed_pruning_bitmap(x, o_ratio, it_num, it_num_thd, static_value):
     if it_num < it_num_thd:
         outlier = get_statistics_outlier(x, o_ratio) # a funny reuse
     else:
         outlier = static_value['outlier']
-    x_outlier, mask = compress_unstructed_pruning_bitmap(x, outlier)
+    x_outlier, mask = compression_unstructed_pruning_bitmap(x, outlier)
     return x_outlier, outlier, mask
     
