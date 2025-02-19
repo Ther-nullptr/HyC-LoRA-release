@@ -1,25 +1,4 @@
 #!/usr/bin/env python
-# coding=utf-8
-# Copyright 2020 The HuggingFace Inc. team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""
-Fine-tuning the library models for causal language modeling (GPT, GPT-2, CTRL, ...) on a text file or a dataset.
-
-Here is the full list of checkpoints on the hub that can be fine-tuned by this script:
-https://huggingface.co/models?filter=text-generation
-"""
-# You can also adapt this script on your own causal language modeling task. Pointers for this are left as comments.
 
 import logging
 import math
@@ -51,14 +30,17 @@ from transformers import (
 )
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
-from transformers.utils import check_min_version, send_example_telemetry
+from transformers.utils import send_example_telemetry
 from transformers.utils.versions import require_version
 
 from peft import PeftModel, get_peft_model, TaskType, LoraConfig
 
+from models.llama.modeling_llama import LlamaForCausalLM
+from models.mistral.modeling_mistral import MistralForCausalLM
+
 import os
 
-os.environ["WANDB_PROJECT"] = "hyclora-improved-wikitext"
+os.environ["WANDB_PROJECT"] = "hyclora-wikitext2"
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.37.0.dev0")
@@ -183,10 +165,6 @@ class ModelArguments:
         default="eager",
         metadata={"help": "Attention implementation. [eager, sdpa]"},
     )
-    replace_module: bool = field(
-        default=False,
-        metadata={"help": "Replace the module with memory efficient modules"},
-    )
     rank: int = field(
         default=16,
         metadata={"help": "Rank of LoRA adapters. LoftQ does not require this config. Used for fp16 LoRA or QLoRA."},
@@ -287,7 +265,7 @@ class DataTrainingArguments:
 
 # hyper parameters about hyclora method
 @dataclass
-class HyCLoRAArguments(transformers.TrainingArguments):
+class HyCLoRAArguments:
     use_hyclora: bool = field(
         default=False,
         metadata={"help": "Whether to replace the original training module to fused training module"}
@@ -300,11 +278,11 @@ class HyCLoRAArguments(transformers.TrainingArguments):
         default=5,
         metadata={"help": "calibration steps"}
     )
-    softmax_outlier_ratio: int = field(
+    softmax_outlier_ratio: float = field(
         default=0.05,
         metadata={"help": "softmax outlier selection ratio"}
     )
-    layernorm_outlier_ratio: int = field(
+    layernorm_outlier_ratio: float = field(
         default=0.005,
         metadata={"help": "layernorm outlier channels selection ratio"}  
     )
@@ -505,19 +483,38 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
-        low_cpu_mem_usage=True,
-        torch_dtype=torch.bfloat16,
-        token=model_args.token,
-        quantization_config=transformers.BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=False,
-            bnb_4bit_quant_type='nf4',
-        ),
-        attn_implementation="eager"
-    )
+    if 'llama' in model_args.model_name_or_path:
+        model = LlamaForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.bfloat16,
+            token=model_args.token,
+            quantization_config=transformers.BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=False,
+                bnb_4bit_quant_type='nf4',
+            ),
+            attn_implementation="eager"
+        )
+        model.set_fused_llama_layer(hyclora_args)
+    elif 'mistral' in model_args.model_name_or_path:
+        model = MistralForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.bfloat16,
+            token=model_args.token,
+            quantization_config=transformers.BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=False,
+                bnb_4bit_quant_type='nf4',
+            ),
+            attn_implementation="eager"
+        )
+        model.set_fused_mistral_layer(hyclora_args)
+    else:
+        raise ValueError("No implementation of model. Now support: llama/mistral")
     
     ###################### training part ######################
     if model_args.lora_init:
@@ -681,7 +678,7 @@ def main():
                 logits = logits[0]
             return logits.argmax(dim=-1)
 
-        metric = evaluate.load("accuracy")
+        metric = evaluate.load("utils/accuracy")
 
         def compute_metrics(eval_preds):
             preds, labels = eval_preds
@@ -711,7 +708,6 @@ def main():
     )
     
     model = model.to(torch.bfloat16)
-    model.set_fused_llama_leyer(hyclora_args)
 
     # Training
     if training_args.do_train:

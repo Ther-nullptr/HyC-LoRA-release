@@ -1163,6 +1163,17 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         else:
             raise ValueError("Unsupported type (Available: [FusedLlamaLayerBaseline | FusedLlamaLayerIntra | FusedLlamaLayerIntraInter])")
         
+        if self.hyclora_config.use_hyclora:
+            print(f"\033[1;34m********** HycLora Configuration **********\033[0m")
+            print(f"\033[1;32m[INFO] HycLora type: {layer_type}\033[0m")
+            print(f"\033[1;32m[INFO] Iteration Threshold: {self.hyclora_config.iteration_threshold}\033[0m")
+            print(f"\033[1;32m[INFO] Softmax Outlier Ratio: {self.hyclora_config.softmax_outlier_ratio}\033[0m")
+            print(f"\033[1;32m[INFO] Layernorm Outlier Ratio: {self.hyclora_config.layernorm_outlier_ratio}\033[0m")
+            print(f"\033[1;32m[INFO] Quantization Bit: {self.hyclora_config.q_bit}\033[0m")
+            print(f"\033[1;34m*******************************************\033[0m")
+        else:
+            print(f"\033[1;31m********** HycLora is not used **********\033[0m")
+        
         for layer in self.model.layers:
             layer.fused_llama_layer = fused_llama_layer_class()
             layer.fused_llama_layer.set_hyclora_config(hyclora_config)

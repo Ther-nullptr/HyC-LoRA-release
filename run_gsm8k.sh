@@ -33,7 +33,7 @@ layernorm_outlier_ratio=0.005
 q_bit=2
 
 # tag
-tag=test-${model_name}-${use_hyclora}-${layer_type}-${q_bit}-${layernorm_outlier_ratio}-${softmax_outlier_ratio}
+tag=${model_name}-${use_hyclora}-${layer_type}-${q_bit}-${layernorm_outlier_ratio}-${softmax_outlier_ratio}
 exp_name=gsm8k-${tag}
 
 # command
@@ -51,8 +51,8 @@ python -u run_gsm8k.py \
     --num_train_epochs $num_train_epochs \
     --per_device_train_batch_size $per_device_train_batch_size \
     --gradient_accumulation_steps $gradient_accumulation_steps \
-    --evaluation_strategy "$evaluation_strategy" \
-    --save_strategy "$save_strategy" \
+    --evaluation_strategy $evaluation_strategy \
+    --save_strategy $save_strategy \
     --weight_decay $weight_decay \
     --warmup_ratio $warmup_ratio \
     --lr_scheduler_type "$lr_scheduler_type" \

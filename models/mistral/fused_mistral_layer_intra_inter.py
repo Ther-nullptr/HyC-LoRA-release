@@ -586,18 +586,6 @@ class FusedMistralLayerIntraInter(torch.nn.Module):
         self.layernorm_outlier_ratio = hyclora_config.layernorm_outlier_ratio
         self.q_bit = hyclora_config.q_bit
         
-        # print the configuration in color format
-        if self.use_hyclora:
-            print(f"\033[1;34m********** HycLora Configuration **********\033[0m")
-            print(f"\033[1;32m[INFO] HycLora type: intra-inter\033[0m")
-            print(f"\033[1;32m[INFO] Iteration Threshold: {self.iteration_threshold}\033[0m")
-            print(f"\033[1;32m[INFO] Softmax Outlier Ratio: {self.softmax_outlier_ratio}\033[0m")
-            print(f"\033[1;32m[INFO] Layernorm Outlier Ratio: {self.layernorm_outlier_ratio}\033[0m")
-            print(f"\033[1;32m[INFO] Quantization Bit: {self.q_bit}\033[0m")
-            print(f"\033[1;34m******************************************\033[0m")
-        else:
-            print(f"\033[1;31m********** HycLora is not used **********\033[0m")
-        
     def forward(
         self,
         input: torch.Tensor,

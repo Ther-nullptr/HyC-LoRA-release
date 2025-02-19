@@ -21,7 +21,7 @@ from accelerate.utils import set_seed
 from models.llama.modeling_llama import LlamaForCausalLM
 from models.mistral.modeling_mistral import MistralForCausalLM
 
-os.environ["WANDB_PROJECT"] = "hyclora-gsm8k-math"
+os.environ["WANDB_PROJECT"] = "hyclora-gsm8k"
 
 IGNORE_INDEX = -100
 DEFAULT_PAD_TOKEN = "[PAD]"
@@ -335,8 +335,8 @@ def train_and_eval():
             attn_implementation=(
                 "flash_attention_2" if model_args.flash_attention else "eager"
             ),
-            trust_remote_code=True,
         )
+        model.set_fused_llama_layer(hyclora_args)
     elif 'mistral' in model_args.model_name_or_path:
         model = MistralForCausalLM.from_pretrained(
             model_args.model_name_or_path,
@@ -353,11 +353,11 @@ def train_and_eval():
             attn_implementation=(
                 "flash_attention_2" if model_args.flash_attention else "eager"
             ),
-            trust_remote_code=True,
         )
+        model.set_fused_mistral_layer(hyclora_args)
     else:
         raise ValueError("No implementation of model. Now support: llama/mistral")
-        
+    
     model = peft.prepare_model_for_kbit_training(
         model,
         use_gradient_checkpointing=model_args.gradient_checkpointing_enable,
@@ -397,9 +397,6 @@ def train_and_eval():
             is_trainable=True,
             token=model_args.token,
         )
-    
-    # set the hyclora config
-    model.set_fused_llama_layer(hyclora_args)
 
     # get the model name
     for name, module in model.named_modules():
