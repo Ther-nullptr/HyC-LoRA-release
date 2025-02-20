@@ -95,6 +95,7 @@ def rope_forward(x, cos, sin):
 
 def rope_backward(dy, cos, sin, n_groups, BLOCK_SIZE, num_warps):
     batch, seq_len, n_heads, head_dim = dy.shape
+    cos, sin = cos.squeeze(), sin.squeeze()
     dy = dy.reshape(batch * seq_len, n_heads * head_dim)
     # Must be reshape not view
     n_rows, n_cols = dy.shape
