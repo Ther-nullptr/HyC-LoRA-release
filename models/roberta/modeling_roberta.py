@@ -45,6 +45,10 @@ from transformers.utils import (
 )
 from transformers.models.roberta.configuration_roberta import RobertaConfig
 
+from .fused_roberta_layer_baseline import FusedRobertaLayer
+from .fused_roberta_layer_intra import FusedRobertaLayerIntra
+from .fused_roberta_layer_intra_inter import FusedRobertaLayerIntraInter
+
 import torch.nn.functional as F
 from einops import rearrange
 
@@ -981,7 +985,7 @@ class RobertaForSequenceClassification(RobertaPreTrainedModel):
         # select fused llama layer type according to the hyclora_config
         layer_type = self.hyclora_config.layer_type
         if layer_type == 'baseline': # no compression
-            fused_roberta_layer_class = FusedRobertaLayerBaseline
+            fused_roberta_layer_class = FusedRobertaLayer
         elif layer_type == 'intra': # intra operator compression only
             fused_roberta_layer_class = FusedRobertaLayerIntra
         elif layer_type == 'intra_inter': # intra+inter operator compression
@@ -1000,7 +1004,7 @@ class RobertaForSequenceClassification(RobertaPreTrainedModel):
         else:
             print(f"\033[1;31m********** HycLora is not used **********\033[0m")
         
-        for layer in self.model.layers:
+        for layer in self.roberta.encoder.layer:
             layer.fused_roberta_layer = fused_roberta_layer_class()
             layer.fused_roberta_layer.set_hyclora_config(hyclora_config)
 

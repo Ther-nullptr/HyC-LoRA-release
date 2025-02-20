@@ -2,8 +2,6 @@ import math
 import torch
 import typing
 import bitsandbytes as bnb
-import torch.nn.functional as F
-import bitsandbytes.functional as BF
 
 from operators.layernorm_kernels import layernorm_forward, layernorm_backward
 from operators.gelu_kernels import gelu_backward
@@ -24,7 +22,7 @@ from ..utils.compute_utils import(
     repeat_kv, repeat_kv_backward
 )
 
-class FusedRobertaLayerFunc(torch.autograd.Function):
+class FusedRobertaLayerIntraInterFunc(torch.autograd.Function):
     @staticmethod
     def forward(
         ctx,
@@ -144,6 +142,7 @@ class FusedRobertaLayerFunc(torch.autograd.Function):
             x=a, o_ratio=softmax_outlier_ratio, it_num=iteration,
             it_num_thd=iteration_threshold, static_value=static_value['a']
         )
+        ctx.a_shape = a.shape
         del a, v
         
         # reshape
@@ -359,6 +358,8 @@ class FusedRobertaLayerFunc(torch.autograd.Function):
             norm_bias_2,
         ) = ctx.saved_tensors
         
+        grad_output = grad_output.to(torch.bfloat16)
+        
         # layernorm
         down = outlier_addition_fuse_decompression_dequantization(down_q, down_scale, down_o, ctx.down_channel, ctx.q_bit)
         grad_layernorm_2, _, _ = layernorm_backward(
@@ -402,6 +403,7 @@ class FusedRobertaLayerFunc(torch.autograd.Function):
         # backward of second GEMM: O = A @ V
         # d L / d V = A.T @ d L / d O
         a = a_o.to_dense()
+        a = a.reshape(ctx.a_shape)
         v_main = decompression_dequantization(v_main_q, v_main_scale, ctx.q_bit)
         v = v_main + v_lora_a.to(v_main.dtype) @ w_v_lora_b.to(v_main.dtype)
         v = hidden_to_head_shape(v, ctx.num_heads)
@@ -497,16 +499,12 @@ class FusedRobertaLayerFunc(torch.autograd.Function):
         ) + (None,) * 9
 
 
-class FusedRobertaLayer(torch.nn.Module):
+class FusedRobertaLayerIntraInter(torch.nn.Module):
     
     def __init__(
         self,
-        hidden_dim: int,
-        num_heads: int,
     ):
-        super(FusedRobertaLayer, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.num_heads = num_heads
+        super(FusedRobertaLayerIntraInter, self).__init__()
         
         self.iteration = 0
         self.iteration_threshold = 5
@@ -526,6 +524,16 @@ class FusedRobertaLayer(torch.nn.Module):
             'up': {'scale': None},
             'down': {'outlier_channel_index': None, 'scale': None},
         }
+
+  
+    def set_hyclora_config(self, hyclora_config):
+        self.hyclora_config = hyclora_config
+        self.use_hyclora = hyclora_config.use_hyclora
+        self.iteration_threshold = hyclora_config.iteration_threshold
+        self.softmax_outlier_ratio = hyclora_config.softmax_outlier_ratio
+        self.layernorm_outlier_ratio = hyclora_config.layernorm_outlier_ratio
+        self.q_bit = hyclora_config.q_bit
+
 
     def forward(
         self,
@@ -566,7 +574,7 @@ class FusedRobertaLayer(torch.nn.Module):
         o_final_channel_idx, o_final_scale, \
         x_medium_scale, \
         up_scale, \
-        down_channel_idx, down_scale = FusedRobertaLayerFunc.apply(
+        down_channel_idx, down_scale = FusedRobertaLayerIntraInterFunc.apply(
             input,
             #############attention part#############
             q_proj_base.weight,

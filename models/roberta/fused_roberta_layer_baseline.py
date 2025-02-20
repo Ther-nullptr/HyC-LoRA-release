@@ -271,6 +271,8 @@ class FusedRobertaLayerFunc(torch.autograd.Function):
             norm_bias_2,
         ) = ctx.saved_tensors
         
+        grad_output = grad_output.to(torch.bfloat16)
+        
         # layernorm
         grad_layernorm_2, _, _ = layernorm_backward(
             grad_output, down, norm_weight_2, norm_bias_2, mean_2, rstd_2, # TODO: other params
@@ -385,12 +387,18 @@ class FusedRobertaLayerFunc(torch.autograd.Function):
 class FusedRobertaLayer(torch.nn.Module):
     def __init__(
         self,
-        hidden_dim: int,
-        num_heads: int,
     ):
         super(FusedRobertaLayer, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.num_heads = num_heads
+
+
+    def set_hyclora_config(self, hyclora_config):
+        self.hyclora_config = hyclora_config
+        self.use_hyclora = hyclora_config.use_hyclora
+        self.iteration_threshold = hyclora_config.iteration_threshold
+        self.softmax_outlier_ratio = hyclora_config.softmax_outlier_ratio
+        self.layernorm_outlier_ratio = hyclora_config.layernorm_outlier_ratio
+        self.q_bit = hyclora_config.q_bit
+        
 
     def forward(
         self,
