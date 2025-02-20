@@ -38,6 +38,8 @@ q_bit=2
 tag=${model_name}-${use_hyclora}-${layer_type}-${q_bit}-${layernorm_outlier_ratio}-${softmax_outlier_ratio}
 exp_name=wikitext-${tag}
 
+mkdir exp_results_wikitext
+
 # command
 python -u run_wikitext2.py \
     --model_name_or_path ${model_name_full} \

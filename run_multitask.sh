@@ -34,6 +34,8 @@ q_bit=2
 tag=${model_name}-${use_hyclora}-${layer_type}-${q_bit}-${layernorm_outlier_ratio}-${softmax_outlier_ratio}
 exp_name=wikitext-${tag}
 
+mkdir exp_results_${task}
+
 # command
 python -u run_multitask.py \
     --rank $rank \

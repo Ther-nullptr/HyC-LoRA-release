@@ -3,9 +3,6 @@ import torch
 import typing
 import bitsandbytes as bnb
 
-import sys
-import os
-
 from operators.rope_kernels import rope_forward, rope_backward, calculate_settings
 from operators.silu_kernels import silu_backward
 from operators.rmsnorm_kernels import rmsnorm_backward, rmsnorm_forward
