@@ -456,6 +456,14 @@ class FusedMistralLayerBaseline(torch.nn.Module):
         self.iteration = 0
         self.static_value = None
         
+    def set_hyclora_config(self, hyclora_config):
+        self.hyclora_config = hyclora_config
+        self.use_hyclora = hyclora_config.use_hyclora
+        self.iteration_threshold = hyclora_config.iteration_threshold
+        self.softmax_outlier_ratio = hyclora_config.softmax_outlier_ratio
+        self.layernorm_outlier_ratio = hyclora_config.layernorm_outlier_ratio
+        self.q_bit = hyclora_config.q_bit
+        
     def forward(
         self,
         input: torch.Tensor,

@@ -26,6 +26,8 @@ Evaluations with multiple LLMs such as Llama series, in widely-used downstream t
 HyC-LoRA framework achieves up to 3.97× end-to-end memory reduction compared to baseline, with negligible
 accuracy degradation.
 
+![pic](figures/main-intra-inter.png)
+
 ## Installation
 
 ### Algorithm Implementation
@@ -38,27 +40,62 @@ $ cd <TODO>
 $ pip install -r requirements.txt
 ```
 
-2. Run GSM8K/Wikitext/Math experiment on large LLMs
+2. Run experiments on large LLMs
+
+GSM8K (llama/mistral):
 
 ```bash
-$ python xxx.py
+$ bash run_gsm8k.sh
 ```
 
-3. Run RedPajama long-seq experiment on large LLMs
+Wikitext-2 (llama/mistral):
 
 ```bash
-$ python xxx.py
+$ bash run_wikitext2.sh
 ```
 
-4. Run GLUE experiment on BERT-like models
+Arithmetic Datasets (llama/mistral):
 
 ```bash
-$ python xxx.py
+$ bash download_datasets.sh # prepare the datasets
+$ bash run_multitask.sh
 ```
 
-### System Evaluation
+GLUE (RoBERTa):
+
+```bash
+$ bash run_glue.sh
+```
+
+Long Sequence (llama):
+
+download the data from []()
+
+```bash
+$ bash run_longseq.sh
+```
+
+The core parameters can be adjusted in these script:
+
+```bash
+model_name=llama-2-7b-hf # model name
+model_dir=<your model dir> # model directory
+
+use_hyclora=True # Whether to use the specified training code
+layer_type=intra_inter # Type of HyCLoRA layer [baseline(no compression), intra(optimization in single operator), intra_inter(optimization between operators), intra_inter_full_fuse(equivalent to intra_inter at the algorithmic level, but with kernel fusion for access-intensive operations such as lora, activation function, hadamard product, etc. during forward and backward passes)]
+iteration_threshold=5 # Number of calibration iterations
+softmax_outlier_ratio=0.05 # Outlier ratio for softmax attention map (play no role when use flash_attn)
+layernorm_outlier_ratio=0.005 # Outlier channel ratio for layernorm/rmsnorm
+q_bit=2 # quantization bit for buffered activation
+```
 
 ## TODO
+
+- [x]  GSM8K, Wikitext-2, Arithmetic Datasets, GLUE, and Long Sequence
+- [x]  GLUE
+- [x]  Long Sequence
+- [ ]  Vision Transformer
+- [ ]  Tutorials
 
 ## Acknowledgement
 

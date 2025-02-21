@@ -45,6 +45,7 @@ from transformers.models.mistral.configuration_mistral import MistralConfig
 from .fused_mistral_layer_baseline import FusedMistralLayerBaseline
 from .fused_mistral_layer_intra import FusedMistralLayerIntra
 from .fused_mistral_layer_intra_inter import FusedMistralLayerIntraInter
+from .fused_mistral_layer_intra_inter_full_fuse import FusedMistralLayerIntraInterFullFuse
 
 from ..utils.compute_utils import repeat_kv
 
@@ -1005,6 +1006,8 @@ class MistralForCausalLM(MistralPreTrainedModel):
             fused_mistral_layer_class = FusedMistralLayerIntra
         elif layer_type == 'intra_inter': # intra+inter operator compression
             fused_mistral_layer_class = FusedMistralLayerIntraInter
+        elif layer_type == 'intra_inter_full_fuse': # intra+inter+inter operator compression
+            fused_mistral_layer_class = FusedMistralLayerIntraInterFullFuse
         else:
             raise ValueError("Unsupported type (Available: [FusedMistralLayerBaseline | FusedMistralLayerIntra | FusedMistralLayerIntraInter])")
         

@@ -162,6 +162,7 @@ class FusedMistralLayerIntraInterFunc(torch.autograd.Function):
 
         # forward: softmax
         a = torch.softmax(s, dim=-1, dtype=v.dtype)  # [bsz, num_heads, q_len, q_len]
+        ctx.a_shape = a.shape
         del s
         
         #* compress a
@@ -246,7 +247,6 @@ class FusedMistralLayerIntraInterFunc(torch.autograd.Function):
         
         # residual connection
         x_out = x_medium + down
-        ctx.seq_length = x_out.shape[1]
         del x_medium, down
         
         ctx.save_for_backward(
@@ -424,6 +424,7 @@ class FusedMistralLayerIntraInterFunc(torch.autograd.Function):
         
         #* dequantize a, v
         a = a_o.to_dense()
+        a = a.reshape(ctx.a_shape)
         v_main = decompression_dequantization(v_main_q, v_main_scale, ctx.q_bit)
         v = v_main + (v_lora_a.to(v_main.dtype)) @ w_v_lora_b.to(v_main.dtype)
         v = hidden_to_head_shape(v, ctx.num_key_value_heads)

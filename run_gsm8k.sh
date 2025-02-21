@@ -1,10 +1,18 @@
 #!/bin/bash
 set -x
 
-# model parameters
-model_name=llama-2-7b-hf
+#! model parameters
+model_name=mistral-7b-v0.1
 model_dir=/home/yujin-wa20/projects/aliendao
 model_name_full=${model_dir}/${model_name}
+
+#! HyCLoRA core parameters
+use_hyclora=True
+layer_type=baseline
+iteration_threshold=5
+softmax_outlier_ratio=0.05
+layernorm_outlier_ratio=0.005
+q_bit=4
 
 # training parameters
 lora_init_type=qlora
@@ -12,9 +20,8 @@ lr=3e-4
 lora_rank=16
 lora_alpha=16
 gradient_accumulation_steps=4
-batch_size=4
 num_train_epochs=6
-per_device_train_batch_size=$batch_size
+per_device_train_batch_size=4
 evaluation_strategy="no"
 save_strategy="epoch"
 weight_decay=0.1
@@ -24,14 +31,6 @@ logging_steps=10
 do_train=True
 do_eval=True
 
-#! HyCLoRA core parameters
-use_hyclora=True
-layer_type=intra_inter
-iteration_threshold=5
-softmax_outlier_ratio=0.05
-layernorm_outlier_ratio=0.005
-q_bit=2
-
 # tag
 tag=${model_name}-${use_hyclora}-${layer_type}-${q_bit}-${layernorm_outlier_ratio}-${softmax_outlier_ratio}
 exp_name=gsm8k-${tag}
@@ -39,7 +38,7 @@ exp_name=gsm8k-${tag}
 mkdir exp_results_gsm8k
 
 # command
-python -u run_gsm8k/run_gsm8k.py \
+python -u run_gsm8k.py \
     --lora_init \
     --init_lora_weights $lora_init_type \
     --model_name_or_path ${model_name_full} \

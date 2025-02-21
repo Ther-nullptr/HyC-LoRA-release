@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 
-# Model parameters
+#! Model parameters
 model_type=llama                    # Type of the model (e.g., llama)
 model_name=llama-2-7b-hf            # Specific model name or path
 model_dir=/home/yujin-wa20/projects/aliendao
@@ -15,7 +15,7 @@ pg19_validation_file=pg19_validation.bin  # PG19 validation file name
 output_dir=out                      # Directory for saving experiment results
 cache_dir=out_cache                 # Directory for caching data or models
 
-# HyCLoRA core parameters
+#! HyCLoRA core parameters
 use_hyclora=True                    # Whether to use HyCLoRA
 layer_type=baseline              # Type of HyCLoRA layer (e.g., intra_inter)
 iteration_threshold=5               # Calibration steps for HyCLoRA
@@ -86,4 +86,3 @@ python -u run_longseq.py \
     --softmax_outlier_ratio $softmax_outlier_ratio \
     --q_bit $q_bit | tee $output_dir/${out_name}.log
 
-echo "Experiment completed. Results are saved in $output_dir/${out_name}.log"

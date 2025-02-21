@@ -52,6 +52,7 @@ from transformers.models.llama.configuration_llama import LlamaConfig
 from .fused_llama_layer_baseline import FusedLlamaLayerBaseline
 from .fused_llama_layer_intra import FusedLlamaLayerIntra
 from .fused_llama_layer_intra_inter import FusedLlamaLayerIntraInter
+from .fused_llama_layer_intra_inter_full_fuse import FusedLlamaLayerIntraInterFullFuse
 
 from ..utils.compute_utils import repeat_kv
 
@@ -1158,6 +1159,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             fused_llama_layer_class = FusedLlamaLayerIntra
         elif layer_type == 'intra_inter': # intra+inter operator compression
             fused_llama_layer_class = FusedLlamaLayerIntraInter
+        elif layer_type == 'intra_inter_full_fuse':
+            fused_llama_layer_class = FusedLlamaLayerIntraInterFullFuse
         else:
             raise ValueError("Unsupported type (Available: [FusedLlamaLayerBaseline | FusedLlamaLayerIntra | FusedLlamaLayerIntraInter])")
         

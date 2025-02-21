@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 
-# Model parameters
+#! Model parameters
 model_name=roberta-base          # Pre-trained model name
 task_name=rte                    # Task name for GLUE benchmark (e.g., RTE for Recognizing Textual Entailment)
 
@@ -13,7 +13,7 @@ per_device_train_batch_size=32   # Training batch size per device
 per_device_eval_batch_size=128   # Evaluation batch size per device
 num_train_epochs=10              # Number of training epochs
 
-# HyCLoRA core parameters
+#! HyCLoRA core parameters
 use_hyclora=True                 # Whether to use HyCLoRA
 layer_type=intra_inter           # Type of HyCLoRA layer (e.g., intra_inter)
 iteration_threshold=5            # Calibration steps for HyCLoRA
