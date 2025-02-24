@@ -8,7 +8,7 @@
 [[Paper](xxxxxxxx)]
 
 <div align="center">
-  <img src="figures/main-intra-inter.png" width="80%" alt="HyC-LoRA Framework Overview">
+  <img src="figures/main-intra-inter.jpg" width="80%" alt="HyC-LoRA Framework Overview">
   <p>HyC-LoRA's hybrid compression framework combining intra-operator and inter-operator optimizations</p>
 </div>
 
