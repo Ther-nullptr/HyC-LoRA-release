@@ -1,46 +1,52 @@
 # HyC-LoRA: Memory Efficient LoRA Fine-tuning with Hybrid Activation Compression
 
-[[paper](xxxxxxxx)]
+[![arXiv](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)](xxxxxxxx)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0%2B-red.svg)](https://pytorch.org/)
 
-## Abstract
+[[Paper](xxxxxxxx)]
 
-Large language models (LLMs) are widely used in applications like conversation and text summarization. With
-the demand for model customization and privacy, lightweight fine-tuning methods for large models have begun to
-receive widespread attention. Low-Rank Adaption (LoRA) is one of the most widely used fine-tuning algorithms,
-which significantly reduces the tunable weights and associated optimizer memory when transferring pre-trained
-LLMs to downstream tasks. However, past works lacked attention to the overhead of buffered activations in
-low-rank adaption, leading to suboptimal system memory usage.
+<div align="center">
+  <img src="figures/main-intra-inter.png" width="80%" alt="HyC-LoRA Framework Overview">
+  <p>HyC-LoRA's hybrid compression framework combining intra-operator and inter-operator optimizations</p>
+</div>
 
-To reduce buffered activation memory consumption and further enable the on-device memory efficient fine-tuning
-system, we propose HyC-LoRA, a variant of the LoRA training method using a hybrid compression framework
-enabling almost 2-bit buffered activation quantization in all operators. HyC-LoRA observes that the temporarily
-buffered activation for back-propagation dominates the memory consumption in the LoRA fine-tuning process,
-and those in non-linear modules act as dominant memory consumers, whose quantization is more challenging.
-Based on this, HyC-LoRA proposes a hybrid compression mechanism with two tiers: (1) Intra-operator hybrid
-compression: HyC-LoRA detects extreme outliers in buffered activation and mitigates the quantization error
-by structured outlier storage; (2) Inter-operator hybrid compression: HyC-LoRA utilizes the LoRA adapter
-to achieve compensation for quantization errors and selective recomputation, through inter-operator reordering
-and fusion. Finally, HyC-LoRA implements a buffered activation compression system and integrates it with the
-existing machine learning framework to complete the last mile of lightweight storage for fine-tuning algorithms.
-Evaluations with multiple LLMs such as Llama series, in widely-used downstream tasks show the proposed
-HyC-LoRA framework achieves up to 3.97× end-to-end memory reduction compared to baseline, with negligible
-accuracy degradation.
+## 📖 Abstract
 
-![pic](figures/main-intra-inter.png)
+Large language models (LLMs) face critical memory challenges during on-device fine-tuning. While LoRA reduces trainable parameters, **buffered activation memory** remains a bottleneck. HyC-LoRA addresses this with:
 
-## Installation
+✨ **Key Innovations**:
+- **Buffered Activation Mechansim Analysis**: System's view of buffered activation problem in LoRA fine-tuning
+- **Two-tier Optimization**:
+  - *Intra-operator*: Mitigates quantization errors via outlier detection
+  - *Inter-operator*: Error compensation through LoRA adapter fusion
+- **System Integration**: Full-stack implementation achieving **3.97× memory reduction** with minimal accuracy loss
 
-### Algorithm Implementation
+## 🚀 Quick Start
 
-1. Install the required packages
+### Prerequisites
+- CUDA 12.0+
+- Python 3.10+
+- PyTorch 2.0+
+
+### Installation
 
 ```bash
-$ git clone https://github.com/<TODO>
-$ cd <TODO>
-$ pip install -r requirements.txt
+# Clone repository
+git clone https://github.com/<TODO>
+cd HyC-LoRA
+
+# Create conda environment (recommended)
+conda create -n hyclora python=3.10
+conda activate hyclora
+
+# Install dependencies
+pip install -r requirements.txt
+mkdir <your model dir> # Then download the huggingface models into the dir. It is recommended to use the local model dir to avoid network problems :-(
 ```
 
-2. Run experiments on large LLMs
+### Run Experiments
 
 GSM8K (llama/mistral):
 
@@ -69,35 +75,53 @@ $ bash run_glue.sh
 
 Long Sequence (llama):
 
-download the data from []()
+download the data from:
+
+* RedPajama training dataset: [link](https://drive.google.com/drive/folders/18Cf9KoGT7NeCZImQL_zvrdKJlIZnf4yW?usp=sharing)
+* PG19 validation dataset [link](https://drive.google.com/file/d/1rbJvb0qRIf2mQoN2ON7S93TbTzMnlrN6/view?usp=share_link)
+* proof-pile test dataset [link](https://drive.google.com/file/d/1bUI5lPDvrqzY_XXJJ2sSuvZx0Y9AZClE/view?usp=share_link)
+
+put them to `./dataset`, then run:
 
 ```bash
 $ bash run_longseq.sh
 ```
 
+## ⚙️ Configuration Guide
+
 The core parameters can be adjusted in these script:
 
 ```bash
-model_name=llama-2-7b-hf # model name
-model_dir=<your model dir> # model directory
+# model config
+model_name=llama-2-7b-hf
+model_dir=<your model dir>
 
-use_hyclora=True # Whether to use the specified training code
-layer_type=intra_inter # Type of HyCLoRA layer [baseline(no compression), intra(optimization in single operator), intra_inter(optimization between operators), intra_inter_full_fuse(equivalent to intra_inter at the algorithmic level, but with kernel fusion for access-intensive operations such as lora, activation function, hadamard product, etc. during forward and backward passes)]
-iteration_threshold=5 # Number of calibration iterations
-softmax_outlier_ratio=0.05 # Outlier ratio for softmax attention map (play no role when use flash_attn)
-layernorm_outlier_ratio=0.005 # Outlier channel ratio for layernorm/rmsnorm
-q_bit=2 # quantization bit for buffered activation
+# hyclora hyperparameter config
+use_hyclora=True
+layer_type=intra_inter
+iteration_threshold=5
+softmax_outlier_ratio=0.05
+layernorm_outlier_ratio=0.005
+q_bit=4
 ```
 
-## TODO
+|         Parameter         |                Description                 |                        Options                        |   Default   |
+| :-----------------------: | :----------------------------------------: | :---------------------------------------------------: | :---------: |
+|       `use_hyclora`       |        Enable HyC-LoRA type training (forward+backward) code        |                     [True, False]                     |    True     |
+|       `layer_type`        |            Compression strategy            | [baseline, intra, intra_inter, intra_inter_full_fuse] | intra_inter |
+|          `q_bit`          |     Quantization bits for activations      |                       [2, 4,8]                       |      4      |
+|  `softmax_outlier_ratio`  |    Outlier threshold for attention maps    |                        0.0-1.0                        |    0.05     |
+| `layernorm_outlier_ratio` | Outlier threshold for layernorm/rmsnorm layers |                        0.0-1.0                        |     0.005        |
 
-- [x]  GSM8K, Wikitext-2, Arithmetic Datasets, GLUE, and Long Sequence
-- [x]  GLUE
-- [x]  Long Sequence
-- [ ]  Vision Transformer
-- [ ]  Tutorials
 
-## Acknowledgement
+> explaination of `layer_type`:
+> * `baseline`: No compression
+> * `intra`: Intra-operator optimization
+> * `intra_inter`: Intra-operator optimization + Inter-operator optimization
+> * `intra_inter_full_fuse`: Equivalent to `intra_inter` at the algorithmic level, but with kernel fusion for high EMA (external memory access) operations such as LoRA, activation function, Hadamard product, quantization etc. during forward and backward passes
+
+
+## 🤝 Acknowledgement
 
 Our code is built upon the following projects:
 
@@ -108,6 +132,14 @@ Our code is built upon the following projects:
 
 We thank the authors for their open-sourced code.
 
-## Citation
+## 📜 Citation
 
-TODO
+```
+@article{hyclora2024,
+  title={HyC-LoRA: Memory Efficient LoRA Fine-tuning with Hybrid Activation Compression},
+  author={Anonymous Authors},
+  journal={Preprint},
+  year={2024},
+  url={xxxxxxxx}
+}
+```

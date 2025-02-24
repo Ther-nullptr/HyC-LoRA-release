@@ -2,7 +2,7 @@
 set -x
 
 #! model parameters
-model_name=mistral-7b-v0.1
+model_name=llama-3-8b-hf
 model_dir=/home/yujin-wa20/projects/aliendao
 model_name_full=${model_dir}/${model_name}
 
