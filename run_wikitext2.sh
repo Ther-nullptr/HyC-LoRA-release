@@ -2,7 +2,7 @@
 set -x
 
 # model parameters
-model_name=llama-2-7b-hf
+model_name=llama-3-8b-hf
 model_dir=/home/yujin-wa20/projects/aliendao
 model_name_full=${model_dir}/${model_name}
 
@@ -13,7 +13,7 @@ attn_implementation=eager
 rank=16
 lora_alpha=16
 lr=3e-4
-gradient_accumulation_steps=4
+gradient_accumulation_steps=128
 num_train_epochs=3
 per_device_train_batch_size=2
 per_device_eval_batch_size=4
@@ -28,7 +28,7 @@ block_size=1024
 
 #! HyCLoRA core parameters
 use_hyclora=True
-layer_type=intra_inter
+layer_type=intra_inter_full_fuse
 iteration_threshold=5
 softmax_outlier_ratio=0.05
 layernorm_outlier_ratio=0.005

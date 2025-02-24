@@ -149,7 +149,7 @@ class FusedLlamaLayerIntraInterFunc(torch.autograd.Function):
         k = rope_forward(k.transpose(1, 2), cos, sin).transpose(1, 2)
 
         # forward: S = Q @ K.T / sqrt(d_k)
-        if q.shape != k.shape:
+        if num_heads != num_key_value_heads:
             k = repeat_kv(k, n_rep=num_heads // num_key_value_heads)
             
         s = q @ k.transpose(-2, -1) / math.sqrt(head_dim)

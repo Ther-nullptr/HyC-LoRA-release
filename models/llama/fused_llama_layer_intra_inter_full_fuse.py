@@ -153,7 +153,7 @@ class FusedLlamaLayerIntraInterFullFuseFunc(torch.autograd.Function):
         k = rope_forward(k.transpose(1, 2), cos, sin).transpose(1, 2)
 
         # forward: S = Q @ K.T / sqrt(d_k)
-        if q.shape != k.shape:
+        if num_heads != num_key_value_heads:
             k = repeat_kv(k, n_rep=num_heads // num_key_value_heads)
             
         s = q @ k.transpose(-2, -1) / math.sqrt(head_dim)
@@ -415,13 +415,17 @@ class FusedLlamaLayerIntraInterFullFuseFunc(torch.autograd.Function):
         a = a.reshape(ctx.a_shape)
         v_main = decompression_dequantization(v_main_q, v_main_scale, ctx.q_bit)
         v = v_main + (v_lora_a.to(v_main.dtype)) @ w_v_lora_b.to(v_main.dtype)
-        v = hidden_to_head_shape(v, ctx.num_heads)
+        v = hidden_to_head_shape(v, ctx.num_key_value_heads)
+        if ctx.num_heads != ctx.num_key_value_heads:
+            v = repeat_kv(v, n_rep=ctx.num_heads // ctx.num_key_value_heads)
         del a_o, v_main_q, v_main_scale, v_main
         
         # backward of second GEMM: O = A @ V
         # d L / d V = A.T @ d L / d O
         grad_v = a.transpose(-2, -1) @ grad_o
         grad_a = grad_o @ v.transpose(-2, -1)
+        if ctx.num_heads != ctx.num_key_value_heads:
+            grad_v = repeat_kv_backward(grad_v, n_rep=ctx.num_heads // ctx.num_key_value_heads)
         del grad_o, v
 
         # backward of softmax
@@ -443,9 +447,12 @@ class FusedLlamaLayerIntraInterFullFuseFunc(torch.autograd.Function):
         k_main = decompression_dequantization(k_main_q, k_main_scale, ctx.q_bit)
         del k_main_q, k_main_scale
         k = k_main + (k_lora_a.to(k_main.dtype)) @ w_k_lora_b.to(k_main.dtype)
-        k = hidden_to_head_shape(k, ctx.num_heads)
+        k = hidden_to_head_shape(k, ctx.num_key_value_heads)
         del k_main
         k = rope_forward(k.transpose(1, 2), cos, sin).transpose(1, 2)
+        if ctx.num_heads != ctx.num_key_value_heads:
+            k = repeat_kv(k, n_rep=ctx.num_heads // ctx.num_key_value_heads)
+            grad_k = repeat_kv_backward(grad_k, n_rep=ctx.num_heads // ctx.num_key_value_heads)
         grad_q = grad_s @ k
         del grad_s, k
 

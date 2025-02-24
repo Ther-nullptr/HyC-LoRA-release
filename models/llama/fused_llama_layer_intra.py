@@ -625,6 +625,7 @@ class FusedLlamaLayerIntra(torch.nn.Module):
         attention_mask: torch.Tensor,
         num_heads: int,
         head_dim: int,
+        num_key_value_heads: int,
     ):
         y, x_channel_idx, x_scale, \
         x_norm_1_scale, \
@@ -689,6 +690,7 @@ class FusedLlamaLayerIntra(torch.nn.Module):
             attention_mask,
             num_heads,
             head_dim,
+            num_key_value_heads,
             ####################################
             self.iteration,
             self.iteration_threshold,

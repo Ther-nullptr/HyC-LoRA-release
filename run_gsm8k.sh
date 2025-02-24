@@ -41,7 +41,7 @@ mkdir exp_results_gsm8k
 python -u run_gsm8k.py \
     --lora_init \
     --init_lora_weights $lora_init_type \
-    --model_name_or_path ${model_name_full} \
+    --model_name_or_path $model_name_full \
     --data_name gsm8k \
     --learning_rate $lr \
     --rank $lora_rank \
@@ -56,7 +56,7 @@ python -u run_gsm8k.py \
     --save_strategy $save_strategy \
     --weight_decay $weight_decay \
     --warmup_ratio $warmup_ratio \
-    --lr_scheduler_type "$lr_scheduler_type" \
+    --lr_scheduler_type $lr_scheduler_type \
     --logging_steps $logging_steps \
     --do_train $do_train \
     --softmax_outlier_ratio $softmax_outlier_ratio \
