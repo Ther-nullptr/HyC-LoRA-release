@@ -618,7 +618,7 @@ def main():
         for dataset_name in eval_datasets:
             # split evalset into chunks
             for split, (eval_dataset, data_items) in eval_datasets[dataset_name].items():
-                generations, stats = compute_metrics(
+                generations, stats = compute_metrics.compute_metrics(
                     data_args.task, 
                     dataset_name, 
                     model, 
