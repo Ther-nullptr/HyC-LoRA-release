@@ -43,7 +43,8 @@ conda activate hyclora
 
 # Install dependencies
 pip install -r requirements.txt
-mkdir <your model dir> # Then download the huggingface models into the dir. It is recommended to use the local model dir to avoid network problems :-(
+mkdir <your model dir> # Then download the huggingface models into the dir.
+# P.S. It is recommended to use the local model dir to avoid network problems :-(
 ```
 
 ### Run Experiments
