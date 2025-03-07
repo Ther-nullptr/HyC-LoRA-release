@@ -35,7 +35,7 @@ Large language models (LLMs) face critical memory challenges during on-device fi
 ```bash
 # Clone repository
 git clone https://github.com/<TODO>
-cd HyC-LoRA
+cd HyC-LoRA-release
 
 # Create conda environment (recommended)
 conda create -n hyclora python=3.10
