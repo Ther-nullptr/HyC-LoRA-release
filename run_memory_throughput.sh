@@ -9,6 +9,7 @@ model_name_full=${model_dir}/${model_name}
 #! evaluation config
 seq_len=512
 per_device_train_batch_size=4
+gradient_accumulation_steps=4
 evaluate_memory=True
 evaluate_throughput=False
 
@@ -25,9 +26,7 @@ lora_init_type=qlora
 lr=3e-4
 lora_rank=16
 lora_alpha=16
-gradient_accumulation_steps=4
 num_train_epochs=6
-per_device_train_batch_size=4
 evaluation_strategy="no"
 save_strategy="no"
 weight_decay=0.1
